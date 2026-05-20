@@ -1,24 +1,16 @@
 import java.util.Date;
-import java.util.Calendar;
 
-// More examples of code smells
 public class BookUtilities {
-    
-    // CODE SMELL: Duplicated Code - Same date calculation logic repeated
-    public boolean isBookOverdue(Book book) {
-        if (book.getDueDate() == null) {
-            return false;
-        }
-        
-        Date today = new Date();
-        if (book.getDueDate().before(today)) {
-            long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24); // Magic numbers
-            return overdueDays > 0;
-        }
-        return false;
-    }
-    
-    // CODE SMELL: Duplicated Code - Same date calculation logic repeated again
+
+    /**
+     * Code Smell   : Magic Numbers
+     * Fix          : Replaced magic numbers with clearly named constants at the top.
+     */
+    private static final double DEFAULT_FINE_RATE = 0.5;
+    private static final double REFERENCE_FINE_RATE = 1.0;
+    private static final double CHILDREN_FINE_RATE = 0.25;
+    private static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
+
     public long calculateOverdueDays(Book book) {
         if (book.getDueDate() == null) {
             return 0;
@@ -26,17 +18,41 @@ public class BookUtilities {
         
         Date today = new Date();
         if (book.getDueDate().before(today)) {
-            long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24); // Magic numbers
-            return overdueDays;
+            return (today.getTime() - book.getDueDate().getTime()) / MILLIS_IN_A_DAY;
         }
         return 0;
     }
+
+    /**
+     * Code Smell   : Duplicate Code
+     * Fix          : Reused the calculateOverdueDays method instead of copy-pasting the logic.
+     */
+    public boolean isBookOverdue(Book book) {
+        return calculateOverdueDays(book) > 0;
+    }
+
+    /**
+     * Code Smell   : Feature Envy
+     * Fix          : Moved the fine calculation logic out of the report generator.
+     */
+    public double calculateFine(Book book) {
+        long overdueDays = calculateOverdueDays(book);
+        if (overdueDays <= 0) {
+            return 0.0;
+        }
+        
+        if (book.getCategory().equals("Reference")) {
+            return overdueDays * REFERENCE_FINE_RATE;
+        } else if (book.getCategory().equals("Children")) {
+            return overdueDays * CHILDREN_FINE_RATE;
+        } else {
+            return overdueDays * DEFAULT_FINE_RATE;
+        }
+    }
     
-    // CODE SMELL: Feature Envy - This method is overly interested in Book's internal data
     public String generateBookReport(Book book) {
         StringBuilder report = new StringBuilder();
         
-        // Accessing many Book properties (Feature Envy)
         report.append("=== BOOK REPORT ===\n");
         report.append("ISBN: ").append(book.getIsbn()).append("\n");
         report.append("Title: ").append(book.getTitle()).append("\n");
@@ -48,19 +64,9 @@ public class BookUtilities {
             report.append("Borrower: ").append(book.getBorrowerMemberId()).append("\n");
             report.append("Due Date: ").append(book.getDueDate()).append("\n");
             
-            // Magic numbers for fine calculation
-            Date today = new Date();
-            if (book.getDueDate().before(today)) {
-                long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24);
-                double fineRate = 0.5; // Magic number - should be configurable
-                if (book.getCategory().equals("Reference")) {
-                    fineRate = 1.0; // Magic number
-                } else if (book.getCategory().equals("Children")) {
-                    fineRate = 0.25; // Magic number
-                }
-                double totalFine = overdueDays * fineRate;
-                report.append("Overdue Days: ").append(overdueDays).append("\n");
-                report.append("Fine Amount: $").append(totalFine).append("\n");
+            if (isBookOverdue(book)) {
+                report.append("Overdue Days: ").append(calculateOverdueDays(book)).append("\n");
+                report.append("Fine Amount: $").append(calculateFine(book)).append("\n");
             }
         }
         
@@ -68,20 +74,20 @@ public class BookUtilities {
         return report.toString();
     }
     
-    // CODE SPELL: Magic Numbers - Hardcoded values throughout
+    /**
+     * Code Smell   : Magic Numbers
+     * Fix          : Cleaned up the switch statement using "fall-through" cases.
+     */
     public boolean isPopularCategory(String category) {
-        // Magic numbers for category popularity thresholds
         switch (category) {
             case "Fiction":
-                return true; // Always considered popular
             case "Non-Fiction":
-                return true; // Always considered popular
-            case "Reference":
-                return false; // Less popular
             case "Children":
-                return true; // Popular
+                return true; 
+            case "Reference":
             default:
                 return false;
         }
     }
+
 }

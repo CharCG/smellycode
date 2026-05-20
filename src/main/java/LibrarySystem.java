@@ -1,141 +1,69 @@
 import java.util.*;
 import java.text.SimpleDateFormat;
 
-// CODE SMELL: God Class (Blob) - This class handles too many responsibilities
+/**
+ * CODE SMELL: God Class (Blob) - Class holds too many responsibilities
+ * FIX: Delegate behaviors to specialized helper classes (MemberValidator, BookUtilities)
+ */
+
 public class LibrarySystem {
-    private Map<String, Book> books;
-    private Map<String, Member> members;
-    private List<String> transactionHistory;
-    private Map<String, Double> categoryFines;
-    private Scanner scanner;
-    private SimpleDateFormat dateFormat;
+    private final Map<String, Book> books;
+    private final Map<String, Member> members;
+    private final List<String> transactionHistory;
+    private final SimpleDateFormat dateFormat;
+    private final MemberValidator memberValidator;
+    private final BookUtilities bookUtilities; 
+    
+    private static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd";
     
     public LibrarySystem() {
         this.books = new HashMap<>();
         this.members = new HashMap<>();
         this.transactionHistory = new ArrayList<>();
-        this.categoryFines = new HashMap<>();
-        this.scanner = new Scanner(System.in);
-        this.dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        initializeCategoryFines();
+        this.dateFormat = new SimpleDateFormat(DATE_FORMAT_PATTERN);
+        this.memberValidator = new MemberValidator();
+        this.bookUtilities = new BookUtilities(); 
     }
     
-    private void initializeCategoryFines() {
-        categoryFines.put("Fiction", 0.5);
-        categoryFines.put("Non-Fiction", 0.75);
-        categoryFines.put("Reference", 1.0);
-        categoryFines.put("Children", 0.25);
-    }
+   /** 
+    * CODE SMELL (1) : Long Parameter List (LPL) & Data Clumps
+    * FIX            : Group parameters into a generic Map (or ideally, a dedicated Parameter Object / DTO class)
+    */ 
     
-    // CODE SMELL: Long Method - This method is excessively long and does too much
-    public boolean borrowBook(String memberId, String isbn, int borrowDays, String memberName, 
-                             String memberEmail, String memberPhone, String memberAddress, 
-                             boolean isNewMember, String bookTitle, String bookAuthor, String bookCategory) {
+    /**
+     * CODE SMELL (2) : Long Method - Function performs multiple distinct steps in one block
+     * FIX            : Use Extract Method refactoring to split into smaller, cohesive private functions
+     */
+    
+    public boolean borrowBook(Map<String, Object> details) {
+        if (details == null) return false;
         
-        // Validate member exists or create new one
-        Member member = members.get(memberId);
-        if (member == null && isNewMember) {
-            // Create new member with validation
-            if (memberName == null || memberName.trim().length() < 2) {
-                System.out.println("Invalid member name. Must be at least 2 characters.");
-                return false;
-            }
-            if (memberEmail == null || !memberEmail.contains("@") || !memberEmail.contains(".")) {
-                System.out.println("Invalid email format.");
-                return false;
-            }
-            if (memberPhone == null || memberPhone.length() < 10) {
-                System.out.println("Invalid phone number. Must be at least 10 digits.");
-                return false;
-            }
-            if (memberAddress == null || memberAddress.trim().length() < 5) {
-                System.out.println("Invalid address. Must be at least 5 characters.");
-                return false;
-            }
-            
-            member = new Member(memberId, memberName, memberEmail, memberPhone, memberAddress);
-            members.put(memberId, member);
-            System.out.println("New member created: " + memberName);
-        } else if (member == null) {
-            System.out.println("Member not found: " + memberId);
+        String memberId = (String) details.get("memberId");
+        String isbn = (String) details.get("isbn");
+        int borrowDays = (int) details.getOrDefault("borrowDays", 0);
+        
+        Member member = findOrCreateMember(details);
+        if (member == null) return false; 
+        
+        /**
+         * CODE SMELL   : Magic Numbers (Specify at Member.java)
+         * Fix          : Replaced magic numbers with named constants to improve readability and maintainability.
+         */
+        if (!memberValidator.validateMemberForBorrowing(member, false)) {
+            System.out.println("Member " + memberId + " is not eligible to borrow books.");
             return false;
         }
         
-        // Check member borrowing limits based on membership type and history
-        if (member.getBorrowedBooks().size() >= 5) { // Magic number
-            System.out.println("Member has reached maximum borrowing limit of 5 books.");
-            return false;
-        }
+        Book book = findOrCreateBook(details);
+        if (book == null) return false;
         
-        if (member.getTotalFines() > 25.0) { // Magic number
-            System.out.println("Member has outstanding fines exceeding $25.00. Cannot borrow.");
-            return false;
-        }
-        
-        // Validate book exists or create new one
-        Book book = books.get(isbn);
-        if (book == null) {
-            if (bookTitle != null && bookAuthor != null && bookCategory != null) {
-                book = new Book(isbn, bookTitle, bookAuthor, bookCategory);
-                books.put(isbn, book);
-                System.out.println("New book added to library: " + bookTitle);
-            } else {
-                System.out.println("Book not found and insufficient information to create new book.");
-                return false;
-            }
-        }
-        
-        // Check if book is available
         if (!book.isAvailable()) {
-            System.out.println("Book is currently not available: " + book.getTitle());
-            
-            // Calculate estimated return date based on current borrower
-            if (book.getDueDate() != null) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(book.getDueDate());
-                System.out.println("Estimated return date: " + dateFormat.format(cal.getTime()));
-                
-                // Check if book is overdue
-                Date today = new Date();
-                if (book.getDueDate().before(today)) {
-                    long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24);
-                    double fine = overdueDays * categoryFines.get(book.getCategory());
-                    System.out.println("Book is overdue by " + overdueDays + " days. Fine: $" + fine);
-                }
-            }
+            handleUnavailableBook(book);
             return false;
         }
         
-        // Calculate due date
-        Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.DAY_OF_MONTH, borrowDays);
-        Date dueDate = cal.getTime();
-        
-        // Process the borrowing
-        book.setAvailable(false);
-        book.setDueDate(dueDate);
-        book.setBorrowerMemberId(memberId);
-        member.addBorrowedBook(isbn);
-        
-        // Record transaction
-        String transaction = "BORROW: Member " + memberId + " borrowed book " + isbn + 
-                           " (" + book.getTitle() + ") on " + dateFormat.format(new Date()) + 
-                           " due " + dateFormat.format(dueDate);
-        transactionHistory.add(transaction);
-        
-        // Print confirmation with details
-        System.out.println("=== BORROWING CONFIRMATION ===");
-        System.out.println("Member: " + member.getName() + " (" + memberId + ")");
-        System.out.println("Book: " + book.getTitle() + " by " + book.getAuthor());
-        System.out.println("ISBN: " + isbn);
-        System.out.println("Category: " + book.getCategory());
-        System.out.println("Borrow Date: " + dateFormat.format(new Date()));
-        System.out.println("Due Date: " + dateFormat.format(dueDate));
-        System.out.println("Borrowing Period: " + borrowDays + " days");
-        System.out.println("Daily Fine Rate: $" + categoryFines.get(book.getCategory()));
-        System.out.println("Books Currently Borrowed: " + member.getBorrowedBooks().size());
-        System.out.println("Total Books Borrowed (Lifetime): " + member.getBorrowCount());
-        System.out.println("==============================");
+        Date dueDate = calculateDueDate(borrowDays);
+        executeBorrowing(member, book, dueDate, borrowDays);
         
         return true;
     }
@@ -154,22 +82,19 @@ public class LibrarySystem {
         
         Member member = members.get(book.getBorrowerMemberId());
         Date today = new Date();
-        double fine = 0.0;
         
-        // Calculate fine if overdue
-        if (book.getDueDate().before(today)) {
-            long overdueDays = (today.getTime() - book.getDueDate().getTime()) / (1000 * 60 * 60 * 24);
-            fine = overdueDays * categoryFines.get(book.getCategory());
+        double fine = bookUtilities.calculateFine(book);
+        if (fine > 0 && member != null) {
             member.setTotalFines(member.getTotalFines() + fine);
         }
         
-        // Process return
         book.setAvailable(true);
         book.setDueDate(null);
-        member.removeBorrowedBook(isbn);
         book.setBorrowerMemberId(null);
+        if (member != null) {
+            member.removeBorrowedBook(isbn);
+        }
         
-        // Record transaction
         String transaction = "RETURN: Book " + isbn + " returned on " + dateFormat.format(today) + 
                            (fine > 0 ? " with fine $" + fine : "");
         transactionHistory.add(transaction);
@@ -177,66 +102,126 @@ public class LibrarySystem {
         System.out.println("Book returned successfully" + (fine > 0 ? " with fine: $" + fine : ""));
         return true;
     }
-    
-    public void addBook(String isbn, String title, String author, String category) {
-        if (books.containsKey(isbn)) {
-            System.out.println("Book with ISBN " + isbn + " already exists.");
-            return;
-        }
+
+    private Member findOrCreateMember(Map<String, Object> details) {
+        String id = (String) details.get("memberId");
+        boolean isNew = (boolean) details.getOrDefault("isNewMember", false);
         
-        Book book = new Book(isbn, title, author, category);
-        books.put(isbn, book);
-        System.out.println("Book added successfully: " + title);
+        Member member = members.get(id);
+        if (member == null && isNew) {
+            String name = (String) details.get("memberName");
+            String email = (String) details.get("memberEmail");
+            String phone = (String) details.get("memberPhone");
+            String address = (String) details.get("memberAddress");
+            
+            if (!memberValidator.validateMemberForRegistration(name, email, phone, address)) {
+                System.out.println("Invalid member registration details provided.");
+                return null;
+            }
+            member = new Member(id, name, email, phone, address);
+            members.put(id, member);
+            System.out.println("New member created: " + name);
+        } else if (member == null) {
+            System.out.println("Member not found: " + id);
+        }
+        return member;
+    }
+
+    private Book findOrCreateBook(Map<String, Object> details) {
+        String isbn = (String) details.get("isbn");
+        Book book = books.get(isbn);
+        if (book == null) {
+            String title = (String) details.get("bookTitle");
+            String author = (String) details.get("bookAuthor");
+            String category = (String) details.get("bookCategory");
+            
+            if (title != null && author != null && category != null) {
+                book = new Book(isbn, title, author, category);
+                books.put(isbn, book);
+                System.out.println("New book added to library: " + title);
+            } else {
+                System.out.println("Book not found and insufficient information to create new book.");
+                return null;
+            }
+        }
+        return book;
+    }
+
+    private void handleUnavailableBook(Book book) {
+        System.out.println("Book is currently not available: " + book.getTitle());
+        if (book.getDueDate() != null) {
+            System.out.println("Estimated return date: " + dateFormat.format(book.getDueDate()));
+            if (bookUtilities.isBookOverdue(book)) {
+                System.out.println("Book is overdue by " + bookUtilities.calculateOverdueDays(book) + 
+                                   " days. Fine: $" + bookUtilities.calculateFine(book));
+            }
+        }
+    }
+
+    private Date calculateDueDate(int borrowDays) {
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.DAY_OF_MONTH, borrowDays);
+        return cal.getTime();
+    }
+
+    private void executeBorrowing(Member member, Book book, Date dueDate, int borrowDays) {
+        book.setAvailable(false);
+        book.setDueDate(dueDate);
+        book.setBorrowerMemberId(member.getMemberId());
+        member.addBorrowedBook(book.getIsbn());
+        
+        String transaction = "BORROW: Member " + member.getMemberId() + " borrowed book " + book.getIsbn() + 
+                           " (" + book.getTitle() + ") on " + dateFormat.format(new Date()) + 
+                           " due " + dateFormat.format(dueDate);
+        transactionHistory.add(transaction);
+        
+        printBorrowingConfirmation(member, book, dueDate, borrowDays);
+    }
+
+    private void printBorrowingConfirmation(Member member, Book book, Date dueDate, int borrowDays) {
+        System.out.println("=== BORROWING CONFIRMATION ===");
+        System.out.println("Member: " + member.getName() + " (" + member.getMemberId() + ")");
+        System.out.println("Book: " + book.getTitle() + " by " + book.getAuthor());
+        System.out.println("ISBN: " + book.getIsbn());
+        System.out.println("Category: " + book.getCategory());
+        System.out.println("Borrow Date: " + dateFormat.format(new Date()));
+        System.out.println("Due Date: " + dateFormat.format(dueDate));
+        System.out.println("Borrowing Period: " + borrowDays + " days");
+        
+        double dailyRate = bookUtilities.calculateFine(book);
+        System.out.println("Daily Fine Rate: $" + dailyRate); 
+        
+        System.out.println("Books Currently Borrowed: " + member.getBorrowedBooks().size());
+        System.out.println("Total Books Borrowed (Lifetime): " + member.getBorrowCount());
+        System.out.println("==============================");
+    }
+
+    public void addBook(String isbn, String title, String author, String category) {
+        if (books.containsKey(isbn)) return;
+        books.put(isbn, new Book(isbn, title, author, category));
     }
     
     public void addMember(String memberId, String name, String email, String phone, String address) {
-        if (members.containsKey(memberId)) {
-            System.out.println("Member with ID " + memberId + " already exists.");
-            return;
-        }
-        
-        Member member = new Member(memberId, name, email, phone, address);
-        members.put(memberId, member);
-        System.out.println("Member added successfully: " + name);
+        if (members.containsKey(memberId)) return;
+        members.put(memberId, new Member(memberId, name, email, phone, address));
     }
     
     public List<Book> searchBooks(String query) {
+        if (query == null || query.trim().isEmpty()) return new ArrayList<>();
         List<Book> results = new ArrayList<>();
+        String lowerQuery = query.toLowerCase().trim();
         for (Book book : books.values()) {
-            if (book.getTitle().toLowerCase().contains(query.toLowerCase()) ||
-                book.getAuthor().toLowerCase().contains(query.toLowerCase()) ||
-                book.getIsbn().contains(query)) {
+            if (book.getTitle().toLowerCase().contains(lowerQuery) ||
+                book.getAuthor().toLowerCase().contains(lowerQuery) ||
+                book.getIsbn().contains(lowerQuery)) {
                 results.add(book);
             }
         }
         return results;
     }
     
-    public Member getMember(String memberId) {
-        return members.get(memberId);
-    }
-    
-    public Book getBook(String isbn) {
-        return books.get(isbn);
-    }
-    
-    public List<String> getTransactionHistory() {
-        return new ArrayList<>(transactionHistory);
-    }
-    
-    public int getTotalBooks() {
-        return books.size();
-    }
-    
-    public int getTotalMembers() {
-        return members.size();
-    }
-    
-    public int getAvailableBooks() {
-        int count = 0;
-        for (Book book : books.values()) {
-            if (book.isAvailable()) count++;
-        }
-        return count;
-    }
+    public Member getMember(String memberId) { return members.get(memberId); }
+    public Book getBook(String isbn) { return books.get(isbn); }
+    public int getTotalBooks() { return books.size(); }
+    public int getTotalMembers() { return members.size(); }
 }

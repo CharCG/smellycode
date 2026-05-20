@@ -1,119 +1,128 @@
+import java.util.*;
+
 public class Main {
+    private static int totalTests = 0;
+    private static int passedTests = 0;
+    
+    private static Map<String, Object> createBorrowMap(
+            String memberId, String isbn, int borrowDays, String memberName, 
+            String memberEmail, String memberPhone, String memberAddress, 
+            boolean isNewMember, String bookTitle, String bookAuthor, String bookCategory) {
+        
+        Map<String, Object> details = new HashMap<>();
+        details.put("memberId", memberId);
+        details.put("isbn", isbn);
+        details.put("borrowDays", borrowDays);
+        details.put("memberName", memberName);
+        details.put("memberEmail", memberEmail);
+        details.put("memberPhone", memberPhone);
+        details.put("memberAddress", memberAddress);
+        details.put("isNewMember", isNewMember);
+        details.put("bookTitle", bookTitle);
+        details.put("bookAuthor", bookAuthor);
+        details.put("bookCategory", bookCategory);
+        return details;
+    }
+
     public static void main(String[] args) {
         System.out.println("=== Library Management System ===");
-        System.out.println("Demonstrating functionality with deliberate code smells\n");
+        System.out.println("Demonstrating clean functionality after refactoring\n");
         
-        // Create library system
         LibrarySystem library = new LibrarySystem();
         
-        // Add some books
         library.addBook("978-0134685991", "Effective Java", "Joshua Bloch", "Programming");
         library.addBook("978-0596009205", "Head First Design Patterns", "Eric Freeman", "Programming");
         library.addBook("978-0321356680", "Effective C++", "Scott Meyers", "Programming");
         
-        // Add some members
         library.addMember("M001", "Ahmed Ali", "ahmed.ali@email.com", "1234567890", "123 Gulberg Lane");
         library.addMember("M002", "Fatima Khan", "fatima.khan@email.com", "0987654321", "456 DHA Avenue");
         
-        // Demonstrate borrowing
         System.out.println("\n=== Borrowing Books ===");
-        library.borrowBook("M001", "978-0134685991", 14, null, null, null, null, false, null, null, null);
+
+        library.borrowBook(createBorrowMap("M001", "978-0134685991", 14, null, null, null, null, false, null, null, null));
         
-        // Demonstrate new member creation during borrowing
-        library.borrowBook("M003", "978-0596009205", 7, "Hassan Malik", "hassan.malik@email.com", 
-                          "5551234567", "789 Johar Town", true, null, null, null);
-        
-        // Demonstrate search functionality
-        System.out.println("\n=== Search Results ===");
-        library.searchBooks("Java").forEach(System.out::println);
-        
-        // Demonstrate utilities
-        System.out.println("\n=== Book Utilities Demo ===");
-        BookUtilities utilities = new BookUtilities();
-        Book book = library.getBook("978-0134685991");
-        System.out.println(utilities.generateBookReport(book));
-        
-        // Demonstrate member validation
-        System.out.println("\n=== Member Validation Demo ===");
-        MemberValidator validator = new MemberValidator();
-        Member member = library.getMember("M001");
-        double risk = validator.calculateMemberRisk(member);
-        System.out.println("Member risk score: " + risk);
-        
-        // Return books
-        System.out.println("\n=== Returning Books ===");
-        library.returnBook("978-0134685991");
-        library.returnBook("978-0596009205");
-        
-        // Show system statistics
-        System.out.println("\n=== System Statistics ===");
-        System.out.println("Total Books: " + library.getTotalBooks());
-        System.out.println("Total Members: " + library.getTotalMembers());
-        System.out.println("Available Books: " + library.getAvailableBooks());
-        
-        // Run tests
-        System.out.println("\n" + "=".repeat(50));
-        runTests(library);
+        // Memulai seluruh skenario pengujian otomatis
+        runAutomatedTests(library);
     }
-    
-    private static void runTests(LibrarySystem library) {
-        System.out.println("Running Unit Tests...\n");
-        
-        int totalTests = 0;
-        int passedTests = 0;
-        
-        // Test 1: Book management
+
+    private static void runAutomatedTests(LibrarySystem library) {
+        testSuccessfulBorrowing(library);
+        testBorrowingNonExistentMember(library);
+        testNewMemberRegistrationAndBorrowing(library);
+        testNewBookAndMemberBorrowing(library);
+        testBookSearch(library);
+        testMemberValidation();
+        testBookUtilitiesReport(library);
+        testSystemStatistics(library);
+
+        System.out.println("\n=== Test Execution Summary ===");
+        System.out.println("Total Tests Run: " + totalTests);
+        System.out.println("Total Tests Passed: " + passedTests);
+        System.out.println("Total Tests Failed: " + (totalTests - passedTests));
+    }
+
+    // TEST 1: Meminjam buku yang terdaftar
+    private static void testSuccessfulBorrowing(LibrarySystem library) {
         totalTests++;
-        library.addBook("TEST001", "Test Book", "Test Author", "Fiction");
-        Book testBook = library.getBook("TEST001");
-        if (testBook != null && testBook.getTitle().equals("Test Book")) {
-            System.out.println("✓ Test 1 PASSED: Book management");
+        boolean result = library.borrowBook(createBorrowMap("M002", "978-0596009205", 7, null, null, null, null, false, null, null, null));
+        if (result && !library.getBook("978-0596009205").isAvailable()) {
+            System.out.println("✓ Test 1 PASSED: Successful borrowing");
             passedTests++;
         } else {
-            System.out.println("✗ Test 1 FAILED: Book management");
+            System.out.println("✗ Test 1 FAILED: Successful borrowing");
         }
-        
-        // Test 2: Member management
+    }
+
+    // TEST 2: Rejeksi jika ID Member tidak ada di sistem
+    private static void testBorrowingNonExistentMember(LibrarySystem library) {
         totalTests++;
-        library.addMember("TEST001", "Zainab Hussain", "zainab.test@email.com", "1111111111", "Test Colony Karachi");
-        Member testMember = library.getMember("TEST001");
-        if (testMember != null && testMember.getName().equals("Zainab Hussain")) {
-            System.out.println("✓ Test 2 PASSED: Member management");
+        boolean result = library.borrowBook(createBorrowMap("M999", "978-0321356680", 10, null, null, null, null, false, null, null, null));
+        if (!result) {
+            System.out.println("✓ Test 2 PASSED: Non-existent member rejection");
             passedTests++;
         } else {
-            System.out.println("✗ Test 2 FAILED: Member management");
+            System.out.println("✗ Test 2 FAILED: Non-existent member rejection");
         }
-        
-        // Test 3: Borrowing functionality
+    }
+
+    // TEST 3: Registrasi member baru langsung saat meminjam
+    private static void testNewMemberRegistrationAndBorrowing(LibrarySystem library) {
         totalTests++;
-        boolean borrowResult = library.borrowBook("TEST001", "TEST001", 14, null, null, null, null, false, null, null, null);
-        if (borrowResult && !testBook.isAvailable()) {
-            System.out.println("✓ Test 3 PASSED: Book borrowing");
+        boolean result = library.borrowBook(createBorrowMap("M003", "978-0321356680", 10, "John Doe", "john@email.com", "1122334455", "789 Oak Road", true, null, null, null));
+        if (result && library.getMember("M003") != null) {
+            System.out.println("✓ Test 3 PASSED: New member registration and borrowing");
             passedTests++;
         } else {
-            System.out.println("✗ Test 3 FAILED: Book borrowing");
+            System.out.println("✗ Test 3 FAILED: New member registration and borrowing");
         }
-        
-        // Test 4: Return functionality
+    }
+
+    // TEST 4: Registrasi member baru DAN buku baru sekaligus saat meminjam
+    private static void testNewBookAndMemberBorrowing(LibrarySystem library) {
         totalTests++;
-        boolean returnResult = library.returnBook("TEST001");
-        if (returnResult && testBook.isAvailable()) {
-            System.out.println("✓ Test 4 PASSED: Book returning");
+        boolean result = library.borrowBook(createBorrowMap("M004", "TEST001", 5, "Muhammad Usman", "usman@email.com", "1234567890", "Model Town Lahore", true, "Clean Code", "Robert Martin", "Programming"));
+        if (result && library.getBook("TEST001") != null) {
+            System.out.println("✓ Test 4 PASSED: New book and member registration");
             passedTests++;
         } else {
-            System.out.println("✗ Test 4 FAILED: Book returning");
+            System.out.println("✗ Test 4 FAILED: New book and member registration");
         }
-        
-        // Test 5: Search functionality
+    }
+
+    // TEST 5: Pengujian fitur cari buku
+    private static void testBookSearch(LibrarySystem library) {
         totalTests++;
-        if (library.searchBooks("Test").size() > 0) {
+        List<Book> results = library.searchBooks("effective");
+        if (results.size() >= 2) {
             System.out.println("✓ Test 5 PASSED: Book search");
             passedTests++;
         } else {
             System.out.println("✗ Test 5 FAILED: Book search");
         }
-        
-        // Test 6: Validation utilities
+    }
+
+    // TEST 6: Pengujian internal MemberValidator
+    private static void testMemberValidation() {
         totalTests++;
         MemberValidator validator = new MemberValidator();
         boolean validationResult = validator.validateMemberForRegistration("Muhammad Usman", "usman.valid@email.com", "1234567890", "Model Town Lahore");
@@ -123,10 +132,13 @@ public class Main {
         } else {
             System.out.println("✗ Test 6 FAILED: Member validation");
         }
-        
-        // Test 7: Book utilities
+    }
+
+    // TEST 7: Pengujian pelaporan via BookUtilities
+    private static void testBookUtilitiesReport(LibrarySystem library) {
         totalTests++;
         BookUtilities utilities = new BookUtilities();
+        Book testBook = library.getBook("TEST001");
         String report = utilities.generateBookReport(testBook);
         if (report.contains("BOOK REPORT")) {
             System.out.println("✓ Test 7 PASSED: Book utilities");
@@ -134,8 +146,10 @@ public class Main {
         } else {
             System.out.println("✗ Test 7 FAILED: Book utilities");
         }
-        
-        // Test 8: System statistics
+    }
+
+    // TEST 8: Pengujian statistik jumlah total buku dan member
+    private static void testSystemStatistics(LibrarySystem library) {
         totalTests++;
         if (library.getTotalBooks() >= 4 && library.getTotalMembers() >= 3) {
             System.out.println("✓ Test 8 PASSED: System statistics");
@@ -143,11 +157,5 @@ public class Main {
         } else {
             System.out.println("✗ Test 8 FAILED: System statistics");
         }
-        
-        System.out.println("\n=== Test Summary ===");
-        System.out.println("Total Tests: " + totalTests);
-        System.out.println("Passed: " + passedTests);
-        System.out.println("Failed: " + (totalTests - passedTests));
-        System.out.println("Success Rate: " + (passedTests * 100 / totalTests) + "%");
     }
 }
