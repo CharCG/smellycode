@@ -10,13 +10,13 @@ public class MemberValidator {
     private static final int MIN_ADDRESS_LENGTH = 5;
 	
 	/**
-	 * Code Smell	: Long Parameter List (Bloater) & Dead Code (Dispensables)
-	 * Fix			: Remove Parameter
+	 * Code Smell	: Long Parameter List (Bloaters) & Dead Code (Dispensables)
+	 * Fix			: Remove Parameter & Delete Unused Code
 	 * Explanation	: Removed unused parameters and dead logic to simplify the method.
 	 */
     public boolean validateMemberForBorrowing(Member member, boolean checkHistory) {
         if (!isValidName(member.getName()) ||
-        	!isValidName(member.getEmail()) ||
+        	!isValidEmail(member.getEmail()) ||
         	!isValidPhone(member.getPhoneNumber())) {
         	return false;
         }
