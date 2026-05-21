@@ -1,39 +1,38 @@
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 public class BookUtilities {
 
     /**
-     * Code Smell   : Magic Numbers
-     * Fix          : Replaced magic numbers with clearly named constants at the top.
+     * Code Smell   : Feature Envy
+     * Fix          : Accepted as part of the Utility/Service pattern. The logic is kept here
+     *                to separate business operations from the Book data object.
+     *                (Replaced java.util.Date with java.time.LocalDate to eliminate magic number MILLIS_IN_A_DAY).
      */
-    private static final double DEFAULT_FINE_RATE = 0.5;
-    private static final double REFERENCE_FINE_RATE = 1.0;
-    private static final double CHILDREN_FINE_RATE = 0.25;
-    private static final long MILLIS_IN_A_DAY = 1000 * 60 * 60 * 24;
-
     public long calculateOverdueDays(Book book) {
         if (book.getDueDate() == null) {
             return 0;
         }
         
-        Date today = new Date();
-        if (book.getDueDate().before(today)) {
-            return (today.getTime() - book.getDueDate().getTime()) / MILLIS_IN_A_DAY;
+        LocalDate today = LocalDate.now();
+        if (book.getDueDate().isBefore(today)) {
+            return ChronoUnit.DAYS.between(book.getDueDate(), today);
         }
         return 0;
     }
 
     /**
      * Code Smell   : Duplicate Code
-     * Fix          : Reused the calculateOverdueDays method instead of copy-pasting the logic.
+     * Fix          : Reused the calculateOverdueDays method instead of copy-pasting the date logic.
      */
     public boolean isBookOverdue(Book book) {
         return calculateOverdueDays(book) > 0;
     }
 
     /**
-     * Code Smell   : Feature Envy
-     * Fix          : Moved the fine calculation logic out of the report generator.
+     * Code Smell   : Conditional Complexity (If-Else Chains)
+     * Fix          : Removed the if-else block. Delegated the fine rate retrieval 
+     *                directly to the BookCategory Enum (Polymorphism).
      */
     public double calculateFine(Book book) {
         long overdueDays = calculateOverdueDays(book);
@@ -41,13 +40,7 @@ public class BookUtilities {
             return 0.0;
         }
         
-        if (book.getCategory().equals("Reference")) {
-            return overdueDays * REFERENCE_FINE_RATE;
-        } else if (book.getCategory().equals("Children")) {
-            return overdueDays * CHILDREN_FINE_RATE;
-        } else {
-            return overdueDays * DEFAULT_FINE_RATE;
-        }
+        return overdueDays * book.getCategory().getFineRate();
     }
     
     public String generateBookReport(Book book) {
@@ -57,7 +50,7 @@ public class BookUtilities {
         report.append("ISBN: ").append(book.getIsbn()).append("\n");
         report.append("Title: ").append(book.getTitle()).append("\n");
         report.append("Author: ").append(book.getAuthor()).append("\n");
-        report.append("Category: ").append(book.getCategory()).append("\n");
+        report.append("Category: ").append(book.getCategory().name()).append("\n");
         report.append("Available: ").append(book.isAvailable() ? "Yes" : "No").append("\n");
         
         if (!book.isAvailable()) {
@@ -75,19 +68,11 @@ public class BookUtilities {
     }
     
     /**
-     * Code Smell   : Magic Numbers
-     * Fix          : Cleaned up the switch statement using "fall-through" cases.
+     * Code Smell   : Switch Statements
+     * Fix          : Removed the switch block completely. Replaced with a direct boolean
+     *                check from the BookCategory Enum.
      */
-    public boolean isPopularCategory(String category) {
-        switch (category) {
-            case "Fiction":
-            case "Non-Fiction":
-            case "Children":
-                return true; 
-            case "Reference":
-            default:
-                return false;
-        }
+    public boolean isPopularCategory(BookCategory category) {
+        return category.isPopular();
     }
-
 }

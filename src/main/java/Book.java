@@ -1,15 +1,25 @@
-import java.util.Date;
+import java.time.LocalDate;
 
+/**
+ * Code Smell   : Data Class
+ * Fix          : Kept as a pure Data Object by design to fit the Service/Utility architecture.
+ */
 public class Book {
     private String isbn;
     private String title;
     private String author;
-    private String category;
+    
+    /**
+     * Code Smell   : Primitive Obsession
+     * Fix          : Changed from String to BookCategory Enum.
+     */
+    private BookCategory category;
+    
     private boolean isAvailable;
-    private Date dueDate;
+    private LocalDate dueDate;
     private String borrowerMemberId;
     
-    public Book(String isbn, String title, String author, String category) {
+    public Book(String isbn, String title, String author, BookCategory category) {
         this.isbn = isbn;
         this.title = title;
         this.author = author;
@@ -19,27 +29,16 @@ public class Book {
         this.borrowerMemberId = null;
     }
     
-    // Getters and setters
+    // === Getters and Setters ===
     public String getIsbn() { return isbn; }
     public String getTitle() { return title; }
     public String getAuthor() { return author; }
-    public String getCategory() { return category; }
+    public BookCategory getCategory() { return category; }
     public boolean isAvailable() { return isAvailable; }
-    public Date getDueDate() { return dueDate; }
+    public LocalDate getDueDate() { return dueDate; }
     public String getBorrowerMemberId() { return borrowerMemberId; }
     
     public void setAvailable(boolean available) { isAvailable = available; }
-    public void setDueDate(Date dueDate) { this.dueDate = dueDate; }
+    public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
     public void setBorrowerMemberId(String borrowerMemberId) { this.borrowerMemberId = borrowerMemberId; }
-    
-    @Override
-    public String toString() {
-        return "Book{" +
-                "isbn='" + isbn + '\'' +
-                ", title='" + title + '\'' +
-                ", author='" + author + '\'' +
-                ", category='" + category + '\'' +
-                ", isAvailable=" + isAvailable +
-                '}';
-    }
 }

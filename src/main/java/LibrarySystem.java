@@ -1,5 +1,6 @@
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.text.SimpleDateFormat;
 
 /**
  * CODE SMELL: God Class (Blob) - Class holds too many responsibilities
@@ -10,19 +11,18 @@ public class LibrarySystem {
     private final Map<String, Book> books;
     private final Map<String, Member> members;
     private final List<String> transactionHistory;
-    private final SimpleDateFormat dateFormat;
     private final MemberValidator memberValidator;
-    private final BookUtilities bookUtilities; 
+    private final BookUtilities bookUtilities;
     
     private static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd";
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN);
     
     public LibrarySystem() {
         this.books = new HashMap<>();
         this.members = new HashMap<>();
         this.transactionHistory = new ArrayList<>();
-        this.dateFormat = new SimpleDateFormat(DATE_FORMAT_PATTERN);
         this.memberValidator = new MemberValidator();
-        this.bookUtilities = new BookUtilities(); 
+        this.bookUtilities = new BookUtilities();
     }
     
    /** 
@@ -62,7 +62,7 @@ public class LibrarySystem {
             return false;
         }
         
-        Date dueDate = calculateDueDate(borrowDays);
+        LocalDate dueDate = calculateDueDate(borrowDays);
         executeBorrowing(member, book, dueDate, borrowDays);
         
         return true;
@@ -81,7 +81,7 @@ public class LibrarySystem {
         }
         
         Member member = members.get(book.getBorrowerMemberId());
-        Date today = new Date();
+        LocalDate today = LocalDate.now();
         
         double fine = bookUtilities.calculateFine(book);
         if (fine > 0 && member != null) {
@@ -95,7 +95,7 @@ public class LibrarySystem {
             member.removeBorrowedBook(isbn);
         }
         
-        String transaction = "RETURN: Book " + isbn + " returned on " + dateFormat.format(today) + 
+        String transaction = "RETURN: Book " + isbn + " returned on " + today.format(DATE_FORMATTER) + 
                            (fine > 0 ? " with fine $" + fine : "");
         transactionHistory.add(transaction);
         
@@ -136,7 +136,8 @@ public class LibrarySystem {
             String category = (String) details.get("bookCategory");
             
             if (title != null && author != null && category != null) {
-                book = new Book(isbn, title, author, category);
+                BookCategory bookCategory = BookCategory.fromString(category);
+                book = new Book(isbn, title, author, bookCategory);
                 books.put(isbn, book);
                 System.out.println("New book added to library: " + title);
             } else {
@@ -150,7 +151,7 @@ public class LibrarySystem {
     private void handleUnavailableBook(Book book) {
         System.out.println("Book is currently not available: " + book.getTitle());
         if (book.getDueDate() != null) {
-            System.out.println("Estimated return date: " + dateFormat.format(book.getDueDate()));
+            System.out.println("Estimated return date: " + book.getDueDate().format(DATE_FORMATTER));
             if (bookUtilities.isBookOverdue(book)) {
                 System.out.println("Book is overdue by " + bookUtilities.calculateOverdueDays(book) + 
                                    " days. Fine: $" + bookUtilities.calculateFine(book));
@@ -158,34 +159,32 @@ public class LibrarySystem {
         }
     }
 
-    private Date calculateDueDate(int borrowDays) {
-        Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.DAY_OF_MONTH, borrowDays);
-        return cal.getTime();
+    private LocalDate calculateDueDate(int borrowDays) {
+        return LocalDate.now().plusDays(borrowDays);
     }
 
-    private void executeBorrowing(Member member, Book book, Date dueDate, int borrowDays) {
+    private void executeBorrowing(Member member, Book book, LocalDate dueDate, int borrowDays) {
         book.setAvailable(false);
         book.setDueDate(dueDate);
         book.setBorrowerMemberId(member.getMemberId());
         member.addBorrowedBook(book.getIsbn());
         
         String transaction = "BORROW: Member " + member.getMemberId() + " borrowed book " + book.getIsbn() + 
-                           " (" + book.getTitle() + ") on " + dateFormat.format(new Date()) + 
-                           " due " + dateFormat.format(dueDate);
+                           " (" + book.getTitle() + ") on " + LocalDate.now().format(DATE_FORMATTER) + 
+                           " due " + dueDate.format(DATE_FORMATTER);
         transactionHistory.add(transaction);
         
         printBorrowingConfirmation(member, book, dueDate, borrowDays);
     }
 
-    private void printBorrowingConfirmation(Member member, Book book, Date dueDate, int borrowDays) {
+    private void printBorrowingConfirmation(Member member, Book book, LocalDate dueDate, int borrowDays) {
         System.out.println("=== BORROWING CONFIRMATION ===");
         System.out.println("Member: " + member.getName() + " (" + member.getMemberId() + ")");
         System.out.println("Book: " + book.getTitle() + " by " + book.getAuthor());
         System.out.println("ISBN: " + book.getIsbn());
         System.out.println("Category: " + book.getCategory());
-        System.out.println("Borrow Date: " + dateFormat.format(new Date()));
-        System.out.println("Due Date: " + dateFormat.format(dueDate));
+        System.out.println("Borrow Date: " + LocalDate.now().format(DATE_FORMATTER));
+        System.out.println("Due Date: " + dueDate.format(DATE_FORMATTER));
         System.out.println("Borrowing Period: " + borrowDays + " days");
         
         double dailyRate = bookUtilities.calculateFine(book);
@@ -198,7 +197,8 @@ public class LibrarySystem {
 
     public void addBook(String isbn, String title, String author, String category) {
         if (books.containsKey(isbn)) return;
-        books.put(isbn, new Book(isbn, title, author, category));
+        BookCategory bookCategory = BookCategory.fromString(category);
+        books.put(isbn, new Book(isbn, title, author, bookCategory));
     }
     
     public void addMember(String memberId, String name, String email, String phone, String address) {
